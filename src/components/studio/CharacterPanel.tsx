@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2 } from 'lucide-react';
-import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop } from '@/types/studio';
+import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop, SkinTone } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,6 +38,25 @@ const POSE_PRESETS: { value: PosePreset; label: string }[] = [
   { value: 'hands-and-knees', label: 'Hands & Knees' },
   { value: 'custom', label: 'Custom' },
 ];
+
+const SKIN_TONE_COLORS = [
+  '#FDEBD0', '#FCD5A8', '#F5C49C', '#E8B48A', '#D4A574',
+  '#C4956A', '#A67B5B', '#8D6748', '#6F4E37', '#5C3D2E', '#3B2417',
+];
+
+const SKIN_TONE_LABELS: Record<number, string> = {
+  0: 'very fair/porcelain white',
+  1: 'fair/light',
+  2: 'light peach',
+  3: 'light tan',
+  4: 'medium light',
+  5: 'medium/olive',
+  6: 'medium tan',
+  7: 'tan/brown',
+  8: 'medium dark brown',
+  9: 'dark brown',
+  10: 'very dark/deep brown',
+};
 
 function SizeSelector({ label, value, onChange }: { label: string; value: BodySize; onChange: (v: BodySize) => void }) {
   return (
@@ -172,7 +191,12 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
               </button>
               {enhancedFace && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Enhanced Result</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Enhanced Result</label>
+                    <button onClick={() => setEnhancedFace(null)} className="p-0.5 hover:bg-destructive/20 rounded transition-colors">
+                      <X className="w-3 h-3 text-destructive" />
+                    </button>
+                  </div>
                   <div className="relative rounded-lg overflow-hidden border border-border">
                     <img src={enhancedFace} alt="Enhanced face" className="w-full h-32 object-cover" />
                   </div>
@@ -241,6 +265,34 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             <SizeSelector label="Chest" value={character.chestSize} onChange={(v) => update('chestSize', v)} />
             <SizeSelector label="Butt" value={character.buttSize} onChange={(v) => update('buttSize', v)} />
             <SizeSelector label="Stomach" value={character.stomachSize} onChange={(v) => update('stomachSize', v)} />
+          </div>
+
+          {/* Skin Tone */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Skin Tone</label>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full border border-border flex-shrink-0"
+                style={{ backgroundColor: SKIN_TONE_COLORS[character.skinTone] }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={character.skinTone}
+                onChange={(e) => update('skinTone', Number(e.target.value) as SkinTone)}
+                className="flex-1 h-2 appearance-none rounded-full cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, ${SKIN_TONE_COLORS.join(', ')})`,
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-[9px] text-muted-foreground">
+              <span>Fair</span>
+              <span>Medium</span>
+              <span>Dark</span>
+            </div>
           </div>
 
           {/* Expression */}

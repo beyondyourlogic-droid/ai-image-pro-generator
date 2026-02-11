@@ -6,6 +6,7 @@ export type AspectRatio = 'auto' | '1:1' | '4:3' | '3:4' | '16:9' | '9:16' | '3:
 export type AIModel = 'google/gemini-3-pro-image-preview' | 'google/gemini-2.5-flash-image';
 export type LightingOption = 'auto' | 'natural' | 'studio' | 'golden-hour' | 'dramatic' | 'neon' | 'soft' | 'backlit' | 'candlelight' | 'moody';
 export type DetailLevel = 'auto' | 'ultra' | 'high' | 'medium' | 'low';
+export type SkinTone = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 export type PosePreset = 'none' | 'standing' | 'sitting' | 'lying-down' | 'kneeling' | 'crawling' | 'squatting' | 'leaning' | 'arched-back' | 'on-all-fours' | 'side-lying' | 'bent-over' | 'looking-back' | 'hands-and-knees' | 'custom';
 
 export interface Prop {
@@ -32,6 +33,7 @@ export interface CharacterConfig {
   customExpression: string;
   actionPrompt: string;
   posePreset: PosePreset;
+  skinTone: SkinTone;
   props: Prop[];
 }
 
@@ -75,6 +77,7 @@ export function createDefaultCharacter(id: string, index: number): CharacterConf
     customExpression: '',
     actionPrompt: '',
     posePreset: 'none',
+    skinTone: 5,
     props: [],
   };
 }

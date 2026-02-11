@@ -106,6 +106,12 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
     }
 
     // Body
+    const skinToneDescriptions: Record<number, string> = {
+      0: 'very fair porcelain white', 1: 'fair light', 2: 'light peach', 3: 'light tan',
+      4: 'medium light', 5: 'medium olive', 6: 'medium tan', 7: 'tan brown',
+      8: 'medium dark brown', 9: 'dark brown', 10: 'very dark deep brown',
+    };
+    charParts.push(`Skin tone: ${skinToneDescriptions[char.skinTone] || 'medium'}.`);
     charParts.push(`Body proportions: chest size ${char.chestSize}, butt size ${char.buttSize}, stomach size ${char.stomachSize}.`);
 
     // Expression
