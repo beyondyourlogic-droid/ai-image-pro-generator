@@ -34,6 +34,11 @@ export interface CharacterConfig {
   actionPrompt: string;
   posePreset: PosePreset;
   skinTone: SkinTone;
+  skinColor: string;
+  hairColor: string;
+  eyeColor: string;
+  hairColorImage: string | null;
+  eyeColorImage: string | null;
   preserveExactHead: boolean;
   props: Prop[];
 }
@@ -79,6 +84,11 @@ export function createDefaultCharacter(id: string, index: number): CharacterConf
     actionPrompt: '',
     posePreset: 'none',
     skinTone: 5,
+    skinColor: '',
+    hairColor: '',
+    eyeColor: '',
+    hairColorImage: null,
+    eyeColorImage: null,
     preserveExactHead: false,
     props: [],
   };

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2, Palette } from 'lucide-react';
 import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop, SkinTone } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface CharacterPanelProps {
   character: CharacterConfig;
@@ -82,6 +83,7 @@ function SizeSelector({ label, value, onChange }: { label: string; value: BodySi
 }
 
 export function CharacterPanel({ character, onChange, onRemove, canRemove }: CharacterPanelProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
   const [propsExpanded, setPropsExpanded] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -306,6 +308,14 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
               <span>Dark</span>
             </div>
           </div>
+
+          {/* Appearance Editor Link */}
+          <button
+            onClick={() => navigate('/appearance')}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <Palette className="w-3 h-3" /> Edit Skin, Hair & Eye Colors
+          </button>
 
           {/* Expression */}
           <div className="space-y-1.5">

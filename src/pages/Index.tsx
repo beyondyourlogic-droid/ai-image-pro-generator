@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Plus, Wand2, Loader2, Trash2 } from 'lucide-react';
 import { CharacterConfig, GenerationSettings, GeneratedImage, createDefaultCharacter } from '@/types/studio';
 import { CharacterPanel } from '@/components/studio/CharacterPanel';
@@ -26,6 +26,23 @@ export default function Index() {
   const [settings, setSettings] = useState<GenerationSettings>(defaultSettings);
   const { isGenerating, generatedImages, generate, clearHistory } = useImageGeneration();
 
+  // Sync characters to sessionStorage for Appearance page
+  useEffect(() => {
+    sessionStorage.setItem('studio-characters', JSON.stringify(characters));
+  }, [characters]);
+
+  // Load back from sessionStorage on mount (in case Appearance page changed them)
+  useEffect(() => {
+    const stored = sessionStorage.getItem('studio-characters');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCharacters(parsed);
+        }
+      } catch {}
+    }
+  }, []);
   const addCharacter = useCallback(() => {
     if (characters.length >= 5) return;
     setCharacters((prev) => [...prev, createDefaultCharacter(crypto.randomUUID(), prev.length)]);
