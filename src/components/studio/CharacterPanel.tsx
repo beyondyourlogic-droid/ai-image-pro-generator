@@ -314,7 +314,7 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             onClick={() => navigate('/appearance')}
             className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
           >
-            <Palette className="w-3 h-3" /> Edit Skin, Hair & Eye Colors
+            <Palette className="w-3 h-3" /> Appearance Editor (Skin/Hair/Eyes)
           </button>
 
           {/* Expression */}

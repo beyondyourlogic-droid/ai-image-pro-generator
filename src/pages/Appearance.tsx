@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Upload, X, Palette, Eye, Scissors } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, X, Palette, Eye, Scissors, Wand2, Loader2, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CharacterConfig } from '@/types/studio';
 import { ImageUpload } from '@/components/studio/ImageUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const SKIN_COLORS = [
   '#FDEBD0', '#FCD5A8', '#F5C49C', '#E8B48A', '#D4A574',
@@ -24,7 +25,7 @@ const EYE_COLORS = [
   '#DAA520', '#B8860B', '#FF8C00', '#9370DB',
 ];
 
-const HAIR_COLOR_LABELS: Record<string, string> = {
+const HAIR_LABELS: Record<string, string> = {
   '#FAFAD2': 'Platinum Blonde', '#F5DEB3': 'Light Blonde', '#DAA520': 'Golden', '#D2691E': 'Auburn',
   '#CD853F': 'Light Brown', '#A0522D': 'Medium Brown', '#8B4513': 'Dark Brown', '#654321': 'Espresso',
   '#3B2F2F': 'Near Black', '#1C1C1C': 'Jet Black', '#000000': 'Black',
@@ -33,7 +34,7 @@ const HAIR_COLOR_LABELS: Record<string, string> = {
   '#32CD32': 'Green', '#808080': 'Silver/Gray',
 };
 
-const EYE_COLOR_LABELS: Record<string, string> = {
+const EYE_LABELS: Record<string, string> = {
   '#8B4513': 'Dark Brown', '#654321': 'Brown', '#3B2F2F': 'Deep Brown', '#1C1C1C': 'Near Black',
   '#006400': 'Dark Green', '#228B22': 'Green', '#6B8E23': 'Olive Green', '#9ACD32': 'Light Green',
   '#4169E1': 'Blue', '#1E90FF': 'Light Blue', '#87CEEB': 'Sky Blue', '#ADD8E6': 'Pale Blue',
@@ -41,29 +42,31 @@ const EYE_COLOR_LABELS: Record<string, string> = {
   '#DAA520': 'Amber', '#B8860B': 'Dark Amber', '#FF8C00': 'Hazel', '#9370DB': 'Violet',
 };
 
+function colorName(hex: string, labels: Record<string, string>) {
+  return labels[hex] || hex;
+}
+
 function ColorGrid({ colors, selected, onSelect, labels }: {
   colors: string[];
   selected: string;
-  onSelect: (color: string) => void;
+  onSelect: (c: string) => void;
   labels?: Record<string, string>;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {colors.map((color) => (
+      {colors.map((c) => (
         <button
-          key={color}
-          onClick={() => onSelect(color)}
-          className={`group relative w-9 h-9 rounded-full border-2 transition-all hover:scale-110 ${
-            selected === color
-              ? 'border-primary ring-2 ring-primary/30 scale-110'
-              : 'border-border hover:border-muted-foreground'
+          key={c}
+          onClick={() => onSelect(selected === c ? '' : c)}
+          className={`group relative w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+            selected === c ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-border hover:border-muted-foreground'
           }`}
-          style={{ backgroundColor: color }}
-          title={labels?.[color] || color}
+          style={{ backgroundColor: c }}
+          title={labels?.[c] || c}
         >
-          {selected === color && (
+          {selected === c && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground/80 border border-primary" />
+              <div className="w-2 h-2 rounded-full bg-primary-foreground/80 border border-primary" />
             </div>
           )}
         </button>
@@ -75,21 +78,20 @@ function ColorGrid({ colors, selected, onSelect, labels }: {
 function CustomColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex items-center gap-2 mt-2">
-      <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Custom:</label>
       <input
         type="color"
         value={value || '#888888'}
         onChange={(e) => onChange(e.target.value)}
-        className="w-8 h-8 rounded-lg border border-border cursor-pointer bg-transparent"
+        className="w-7 h-7 rounded border border-border cursor-pointer bg-transparent"
       />
       <input
         className="flex-1 bg-secondary border border-border rounded-md px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary font-mono"
-        placeholder="#hex or description"
+        placeholder="Custom color or description"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
       {value && (
-        <button onClick={() => onChange('')} className="p-1 hover:bg-destructive/20 rounded transition-colors">
+        <button onClick={() => onChange('')} className="p-1 hover:bg-destructive/20 rounded">
           <X className="w-3 h-3 text-destructive" />
         </button>
       )}
@@ -97,141 +99,199 @@ function CustomColorInput({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
+interface EditResult {
+  id: string;
+  imageUrl: string;
+  timestamp: number;
+}
+
 export default function Appearance() {
   const navigate = useNavigate();
-  const [characters, setCharacters] = useState<CharacterConfig[]>([]);
-  const [selectedCharIdx, setSelectedCharIdx] = useState(0);
+  const [sourceImage, setSourceImage] = useState<string | null>(null);
+  const [skinColor, setSkinColor] = useState('');
+  const [hairColor, setHairColor] = useState('');
+  const [eyeColor, setEyeColor] = useState('');
+  const [hairRefImage, setHairRefImage] = useState<string | null>(null);
+  const [eyeRefImage, setEyeRefImage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [results, setResults] = useState<EditResult[]>([]);
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem('studio-characters');
-    if (stored) {
-      setCharacters(JSON.parse(stored));
+  const buildPrompt = () => {
+    const parts: string[] = [
+      'Edit this photo of a person. Keep the person, pose, background, and clothing EXACTLY the same. ONLY change the following specific features:'
+    ];
+    if (skinColor) parts.push(`- Change their skin color to: ${skinColor}.`);
+    if (hairColor) parts.push(`- Change their hair color to: ${colorName(hairColor, HAIR_LABELS)} (${hairColor}).`);
+    if (hairRefImage) parts.push('- Change their hair to match the color and style shown in the provided hair reference image.');
+    if (eyeColor) parts.push(`- Change their eye color to: ${colorName(eyeColor, EYE_LABELS)} (${eyeColor}).`);
+    if (eyeRefImage) parts.push('- Change their eyes to match the color shown in the provided eye reference image.');
+    if (!skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
+      parts.push('No changes specified — return the image as-is.');
     }
-  }, []);
-
-  useEffect(() => {
-    if (characters.length > 0) {
-      sessionStorage.setItem('studio-characters', JSON.stringify(characters));
-    }
-  }, [characters]);
-
-  const char = characters[selectedCharIdx];
-
-  const updateChar = <K extends keyof CharacterConfig>(key: K, value: CharacterConfig[K]) => {
-    setCharacters(prev => prev.map((c, i) =>
-      i === selectedCharIdx ? { ...c, [key]: value } : c
-    ));
+    parts.push('Do NOT change anything else about the person — same face, same expression, same body, same clothing, same background. Output a single photorealistic image.');
+    return parts.join('\n');
   };
 
-  if (!char) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <p className="text-muted-foreground text-sm">No characters found. Add a character in the studio first.</p>
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
-          >
-            Back to Studio
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleGenerate = async () => {
+    if (!sourceImage) { toast.error('Upload a source image first'); return; }
+    if (!skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
+      toast.error('Select at least one change'); return;
+    }
+    setIsGenerating(true);
+    try {
+      const referenceImages = [sourceImage];
+      if (hairRefImage) referenceImages.push(hairRefImage);
+      if (eyeRefImage) referenceImages.push(eyeRefImage);
+
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: {
+          prompt: buildPrompt(),
+          model: 'google/gemini-3-pro-image-preview',
+          referenceImages,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      if (data?.imageUrl) {
+        setResults(prev => [{ id: crypto.randomUUID(), imageUrl: data.imageUrl, timestamp: Date.now() }, ...prev]);
+        toast.success('Image edited successfully!');
+      } else {
+        toast.error('No image returned from AI');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to edit image');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadImage = (url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `edited-${Date.now()}.png`;
+    link.click();
+  };
+
+  const hasChanges = !!(skinColor || hairColor || eyeColor || hairRefImage || eyeRefImage);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <header className="px-4 py-3 border-b border-border flex items-center gap-3 bg-card">
-        <button
-          onClick={() => navigate('/')}
-          className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-        </button>
-        <div>
-          <h1 className="text-sm font-bold text-foreground tracking-tight">Appearance Editor</h1>
-          <p className="text-[10px] text-muted-foreground">Customize skin, hair & eye colors</p>
-        </div>
-        {characters.length > 1 && (
-          <div className="ml-auto flex gap-1">
-            {characters.map((c, i) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCharIdx(i)}
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
-                  i === selectedCharIdx
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
+    <div className="h-screen flex bg-background overflow-hidden">
+      {/* Left panel - Controls */}
+      <aside className="w-[360px] min-w-[360px] border-r border-border flex flex-col bg-card">
+        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+          <button onClick={() => navigate('/')} className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
+            <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <div>
+            <h1 className="text-sm font-bold text-foreground tracking-tight">Appearance Editor</h1>
+            <p className="text-[10px] text-muted-foreground">Edit skin, hair & eye colors with AI</p>
           </div>
-        )}
-      </header>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
-        <div className="max-w-2xl mx-auto space-y-8">
-          {/* Preview */}
-          {char.faceImage && (
-            <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
-              <img src={char.faceImage} alt="Face reference" className="w-20 h-20 rounded-full object-cover border-2 border-border" />
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">{char.label}</h2>
-                <p className="text-[11px] text-muted-foreground">Editing appearance settings</p>
-              </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-4">
+          {/* Source Image */}
+          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Source Image</label>
+            <ImageUpload label="" value={sourceImage} onChange={setSourceImage} />
+          </div>
 
           {/* Skin Color */}
-          <section className="space-y-3">
+          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Palette className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Skin Color</h3>
+              <Palette className="w-3.5 h-3.5 text-primary" />
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Skin Color</h3>
+              {skinColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: skinColor }} />}
             </div>
-            <p className="text-[11px] text-muted-foreground">Choose a skin tone or enter a custom color. This overrides the skin tone slider on the main page.</p>
-            <ColorGrid colors={SKIN_COLORS} selected={char.skinColor} onSelect={(c) => updateChar('skinColor', c)} />
-            <CustomColorInput value={char.skinColor} onChange={(v) => updateChar('skinColor', v)} />
-          </section>
+            <ColorGrid colors={SKIN_COLORS} selected={skinColor} onSelect={setSkinColor} />
+            <CustomColorInput value={skinColor} onChange={setSkinColor} />
+          </div>
 
           {/* Hair Color */}
-          <section className="space-y-3">
+          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Scissors className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Hair Color</h3>
+              <Scissors className="w-3.5 h-3.5 text-primary" />
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Hair Color</h3>
+              {hairColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: hairColor }} />}
             </div>
-            <p className="text-[11px] text-muted-foreground">Pick a color or upload a reference image of the desired hair color/style.</p>
-            <ColorGrid colors={HAIR_COLORS} selected={char.hairColor} onSelect={(c) => updateChar('hairColor', c)} labels={HAIR_COLOR_LABELS} />
-            <CustomColorInput value={char.hairColor} onChange={(v) => updateChar('hairColor', v)} />
-            <div className="mt-3">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                Or upload hair reference image
-              </label>
-              <ImageUpload label="" value={char.hairColorImage} onChange={(v) => updateChar('hairColorImage', v)} />
+            <ColorGrid colors={HAIR_COLORS} selected={hairColor} onSelect={setHairColor} labels={HAIR_LABELS} />
+            <CustomColorInput value={hairColor} onChange={setHairColor} />
+            <div className="pt-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload hair reference</label>
+              <ImageUpload label="" value={hairRefImage} onChange={setHairRefImage} />
             </div>
-          </section>
+          </div>
 
           {/* Eye Color */}
-          <section className="space-y-3">
+          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Eye Color</h3>
+              <Eye className="w-3.5 h-3.5 text-primary" />
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Eye Color</h3>
+              {eyeColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: eyeColor }} />}
             </div>
-            <p className="text-[11px] text-muted-foreground">Pick an eye color or upload a close-up reference image.</p>
-            <ColorGrid colors={EYE_COLORS} selected={char.eyeColor} onSelect={(c) => updateChar('eyeColor', c)} labels={EYE_COLOR_LABELS} />
-            <CustomColorInput value={char.eyeColor} onChange={(v) => updateChar('eyeColor', v)} />
-            <div className="mt-3">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                Or upload eye reference image
-              </label>
-              <ImageUpload label="" value={char.eyeColorImage} onChange={(v) => updateChar('eyeColorImage', v)} />
+            <ColorGrid colors={EYE_COLORS} selected={eyeColor} onSelect={setEyeColor} labels={EYE_LABELS} />
+            <CustomColorInput value={eyeColor} onChange={setEyeColor} />
+            <div className="pt-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload eye reference</label>
+              <ImageUpload label="" value={eyeRefImage} onChange={setEyeRefImage} />
             </div>
-          </section>
+          </div>
         </div>
-      </div>
+
+        {/* Generate Button */}
+        <div className="p-3 border-t border-border">
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || !sourceImage || !hasChanges}
+            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 glow-primary"
+          >
+            {isGenerating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Editing...</>
+            ) : (
+              <><Wand2 className="w-4 h-4" /> Apply Changes</>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* Right panel - Results */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Results</h2>
+          <span className="text-[10px] text-muted-foreground font-mono">{results.length} edits</span>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
+          {results.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center space-y-2">
+                <Wand2 className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+                <p className="text-sm text-muted-foreground">Upload an image and select changes to get started</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {results.map((r) => (
+                <div key={r.id} className="group relative rounded-xl overflow-hidden border border-border bg-card">
+                  <img src={r.imageUrl} alt="Edited result" className="w-full aspect-square object-cover" />
+                  <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => downloadImage(r.imageUrl)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-md hover:opacity-90 flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" /> Download
+                    </button>
+                    <button
+                      onClick={() => setSourceImage(r.imageUrl)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                    >
+                      Use as Source
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
