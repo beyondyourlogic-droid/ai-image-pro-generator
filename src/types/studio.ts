@@ -34,6 +34,7 @@ export interface CharacterConfig {
   actionPrompt: string;
   posePreset: PosePreset;
   skinTone: SkinTone;
+  preserveExactHead: boolean;
   props: Prop[];
 }
 
@@ -78,6 +79,7 @@ export function createDefaultCharacter(id: string, index: number): CharacterConf
     actionPrompt: '',
     posePreset: 'none',
     skinTone: 5,
+    preserveExactHead: false,
     props: [],
   };
 }
