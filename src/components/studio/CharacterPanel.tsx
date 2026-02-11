@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, User } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2 } from 'lucide-react';
 import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CharacterPanelProps {
   character: CharacterConfig;
@@ -10,7 +12,7 @@ interface CharacterPanelProps {
   canRemove: boolean;
 }
 
-const BODY_SIZES: BodySize[] = ['small', 'medium', 'large', 'extra-large'];
+const BODY_SIZES: BodySize[] = ['extra-small', 'small', 'medium', 'large', 'extra-large'];
 const EXPRESSIONS: { value: ExpressionPreset; label: string }[] = [
   { value: 'default', label: 'Default' },
   { value: 'smiling', label: 'Smiling' },
@@ -52,7 +54,7 @@ function SizeSelector({ label, value, onChange }: { label: string; value: BodySi
                 : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
             }`}
           >
-            {s === 'extra-large' ? 'XL' : s[0].toUpperCase()}
+            {s === 'extra-large' ? 'XL' : s === 'extra-small' ? 'XS' : s[0].toUpperCase()}
           </button>
         ))}
       </div>
@@ -63,6 +65,43 @@ function SizeSelector({ label, value, onChange }: { label: string; value: BodySi
 export function CharacterPanel({ character, onChange, onRemove, canRemove }: CharacterPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const [propsExpanded, setPropsExpanded] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhancedFace, setEnhancedFace] = useState<string | null>(null);
+
+  const enhanceFace = async () => {
+    if (!character.faceImage) return;
+    setIsEnhancing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enhance-face', {
+        body: { imageData: character.faceImage },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      if (data?.imageUrl) {
+        setEnhancedFace(data.imageUrl);
+        toast.success('Face enhanced! You can download or use it as reference.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to enhance face');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const downloadEnhancedFace = () => {
+    if (!enhancedFace) return;
+    const link = document.createElement('a');
+    link.href = enhancedFace;
+    link.download = `enhanced-face-${Date.now()}.png`;
+    link.click();
+  };
+
+  const useEnhancedAsFace = () => {
+    if (!enhancedFace) return;
+    update('faceImage', enhancedFace);
+    setEnhancedFace(null);
+    toast.success('Enhanced face set as reference!');
+  };
 
   const update = <K extends keyof CharacterConfig>(key: K, value: CharacterConfig[K]) => {
     onChange({ ...character, [key]: value });
@@ -114,9 +153,47 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
         <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
           {/* Core Images */}
           <div className="grid grid-cols-2 gap-2">
-            <ImageUpload label="Face" value={character.faceImage} onChange={(v) => update('faceImage', v)} />
+            <ImageUpload label="Face" value={character.faceImage} onChange={(v) => { update('faceImage', v); setEnhancedFace(null); }} />
             <ImageUpload label="Clothing" value={character.clothingImage} onChange={(v) => update('clothingImage', v)} />
           </div>
+          {/* Face Enhancement */}
+          {character.faceImage && (
+            <div className="space-y-2">
+              <button
+                onClick={enhanceFace}
+                disabled={isEnhancing}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isEnhancing ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
+                ) : (
+                  <><Sparkles className="w-3 h-3" /> Enhance Face (HD)</>
+                )}
+              </button>
+              {enhancedFace && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Enhanced Result</label>
+                  <div className="relative rounded-lg overflow-hidden border border-border">
+                    <img src={enhancedFace} alt="Enhanced face" className="w-full h-32 object-cover" />
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={useEnhancedAsFace}
+                      className="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90"
+                    >
+                      <Sparkles className="w-3 h-3" /> Use as Face
+                    </button>
+                    <button
+                      onClick={downloadEnhancedFace}
+                      className="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    >
+                      <Download className="w-3 h-3" /> Download
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Clothing Description</label>
             <input
