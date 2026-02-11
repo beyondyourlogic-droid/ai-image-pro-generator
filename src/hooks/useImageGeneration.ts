@@ -115,7 +115,17 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
       4: 'medium light', 5: 'medium olive', 6: 'medium tan', 7: 'tan brown',
       8: 'medium dark brown', 9: 'dark brown', 10: 'very dark deep brown',
     };
-    charParts.push(`Skin tone: ${skinToneDescriptions[char.skinTone] || 'medium'}.`);
+    if (char.skinColor) {
+      charParts.push(`Skin color: exactly ${char.skinColor}.`);
+    } else {
+      charParts.push(`Skin tone: ${skinToneDescriptions[char.skinTone] || 'medium'}.`);
+    }
+    if (char.hairColor) {
+      charParts.push(`Hair color: exactly ${char.hairColor}.`);
+    }
+    if (char.eyeColor) {
+      charParts.push(`Eye color: exactly ${char.eyeColor}.`);
+    }
     charParts.push(`Body proportions: chest size ${char.chestSize}, butt size ${char.buttSize}, stomach size ${char.stomachSize}.`);
 
     // Expression
