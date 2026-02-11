@@ -178,9 +178,29 @@ function collectReferenceImages(characters: CharacterConfig[], settings: Generat
   return images;
 }
 
+const STORAGE_KEY = 'ai-studio-history';
+
+function loadHistory(): GeneratedImage[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(images: GeneratedImage[]) {
+  try {
+    // Keep last 50 images to avoid storage limits
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, 50)));
+  } catch {
+    // silently fail
+  }
+}
+
 export function useImageGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(loadHistory);
 
   const generate = useCallback(async (characters: CharacterConfig[], settings: GenerationSettings) => {
     setIsGenerating(true);
@@ -208,7 +228,11 @@ export function useImageGeneration() {
           settings: JSON.parse(JSON.stringify(settings)),
           timestamp: Date.now(),
         };
-        setGeneratedImages((prev) => [newImage, ...prev]);
+        setGeneratedImages((prev) => {
+          const next = [newImage, ...prev];
+          saveHistory(next);
+          return next;
+        });
         toast.success('Image generated!');
       } else {
         toast.error('No image was returned. Try adjusting your prompt.');
@@ -221,5 +245,10 @@ export function useImageGeneration() {
     }
   }, []);
 
-  return { isGenerating, generatedImages, generate, setGeneratedImages };
+  const clearHistory = useCallback(() => {
+    setGeneratedImages([]);
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  return { isGenerating, generatedImages, generate, setGeneratedImages, clearHistory };
 }

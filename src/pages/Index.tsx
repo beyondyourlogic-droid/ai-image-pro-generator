@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Wand2, Loader2 } from 'lucide-react';
+import { Plus, Wand2, Loader2, Trash2 } from 'lucide-react';
 import { CharacterConfig, GenerationSettings, GeneratedImage, createDefaultCharacter } from '@/types/studio';
 import { CharacterPanel } from '@/components/studio/CharacterPanel';
 import { GenerationSettingsPanel } from '@/components/studio/GenerationSettings';
@@ -24,7 +24,7 @@ export default function Index() {
     createDefaultCharacter(crypto.randomUUID(), 0),
   ]);
   const [settings, setSettings] = useState<GenerationSettings>(defaultSettings);
-  const { isGenerating, generatedImages, generate } = useImageGeneration();
+  const { isGenerating, generatedImages, generate, clearHistory } = useImageGeneration();
 
   const addCharacter = useCallback(() => {
     if (characters.length >= 5) return;
@@ -121,7 +121,17 @@ export default function Index() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Gallery</h2>
-          <span className="text-[10px] text-muted-foreground font-mono">{generatedImages.length} images</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground font-mono">{generatedImages.length} images</span>
+            {generatedImages.length > 0 && (
+              <button
+                onClick={clearHistory}
+                className="flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+              >
+                <Trash2 className="w-3 h-3" /> Clear
+              </button>
+            )}
+          </div>
         </div>
         <GeneratedGallery images={generatedImages} onReprompt={handleReprompt} />
       </main>
