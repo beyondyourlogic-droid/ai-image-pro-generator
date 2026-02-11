@@ -1,4 +1,4 @@
-export type BodySize = 'small' | 'medium' | 'large' | 'extra-large';
+export type BodySize = 'extra-small' | 'small' | 'medium' | 'large' | 'extra-large';
 export type ExpressionPreset = 'default' | 'smiling' | 'angry' | 'horny' | 'custom';
 export type HairstyleOption = 'default' | 'custom-text' | 'custom-image';
 export type CameraAngle = 'auto' | 'front' | 'side' | 'back' | 'over-shoulder' | 'behind-close' | 'low-angle' | 'high-angle' | 'top-down' | 'dutch-angle' | 'custom';
