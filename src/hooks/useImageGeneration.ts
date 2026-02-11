@@ -85,7 +85,11 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
     const charParts: string[] = [`[${label}]:`];
 
     if (char.faceImage) {
-      charParts.push("Use the provided face reference image to recreate this person's exact facial features, skin tone, and details.");
+      if (char.preserveExactHead) {
+        charParts.push("CRITICAL: Perfectly replicate this person's EXACT head, face, hair, and all facial features from the provided face reference image with ZERO modifications. The head must be an identical copy — same face shape, jawline, hairline, hair color, hair length, hairstyle, eyebrows, eyes, nose, mouth, ears, skin texture, and every detail. Do NOT alter, stylize, or reinterpret any part of the head. Generate a full body below the head.");
+      } else {
+        charParts.push("Use the provided face reference image to recreate this person's exact facial features, skin tone, and details.");
+      }
     }
 
     // Hairstyle

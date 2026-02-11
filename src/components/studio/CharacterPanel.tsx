@@ -175,6 +175,18 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             <ImageUpload label="Face" value={character.faceImage} onChange={(v) => { update('faceImage', v); setEnhancedFace(null); }} />
             <ImageUpload label="Clothing" value={character.clothingImage} onChange={(v) => update('clothingImage', v)} />
           </div>
+          {/* Preserve Exact Head Toggle */}
+          {character.faceImage && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={character.preserveExactHead}
+                onChange={(e) => update('preserveExactHead', e.target.checked)}
+                className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+              />
+              <span className="text-xs font-medium text-foreground">Preserve exact head & face (full body)</span>
+            </label>
+          )}
           {/* Face Enhancement */}
           {character.faceImage && (
             <div className="space-y-2">
