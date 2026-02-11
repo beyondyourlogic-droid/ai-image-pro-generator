@@ -1,0 +1,225 @@
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { CharacterConfig, GeneratedImage, GenerationSettings } from '@/types/studio';
+import { toast } from 'sonner';
+
+function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings): string {
+  const parts: string[] = [];
+
+  parts.push("Generate a 4K ultra HD realistic photograph with perfect attention to lighting, skin detail, and natural appearance.");
+
+  // Aspect ratio
+  if (settings.aspectRatio === 'custom' && settings.customAspectRatio) {
+    parts.push(`Image aspect ratio: ${settings.customAspectRatio}.`);
+  } else if (settings.aspectRatio !== 'auto') {
+    parts.push(`Image aspect ratio: ${settings.aspectRatio}.`);
+  }
+
+  // Camera angle
+  if (settings.cameraAngle === 'custom' && settings.customCameraAngle) {
+    parts.push(`Camera angle: ${settings.customCameraAngle}.`);
+  } else if (settings.cameraAngle !== 'auto') {
+    const angleDescriptions: Record<string, string> = {
+      'front': 'front view',
+      'side': 'side view',
+      'back': 'from behind',
+      'over-shoulder': 'over the shoulder view from behind',
+      'behind-close': 'close-up from behind',
+      'low-angle': 'low angle looking up',
+      'high-angle': 'high angle looking down',
+      'top-down': 'top-down bird\'s eye view',
+      'dutch-angle': 'dutch angle tilted view',
+    };
+    parts.push(`Camera angle: ${angleDescriptions[settings.cameraAngle] || settings.cameraAngle}.`);
+  }
+
+  // Lighting
+  if (settings.lighting !== 'auto') {
+    const lightingDescriptions: Record<string, string> = {
+      'natural': 'natural daylight',
+      'studio': 'professional studio lighting with soft boxes',
+      'golden-hour': 'warm golden hour sunlight',
+      'dramatic': 'dramatic high-contrast lighting with deep shadows',
+      'neon': 'colorful neon lighting',
+      'soft': 'soft diffused lighting',
+      'backlit': 'backlit with rim light creating a glowing outline',
+      'candlelight': 'warm candlelight ambiance',
+      'moody': 'moody low-key atmospheric lighting',
+    };
+    parts.push(`Lighting: ${lightingDescriptions[settings.lighting] || settings.lighting}.`);
+  }
+
+  // Skin detail
+  if (settings.skinDetail !== 'auto') {
+    const skinDescriptions: Record<string, string> = {
+      'ultra': 'Ultra-realistic skin with visible pores, micro-textures, fine hair, and natural skin imperfections',
+      'high': 'Highly detailed skin with natural texture and subtle imperfections',
+      'medium': 'Standard realistic skin detail',
+      'low': 'Smooth, simplified skin rendering',
+    };
+    parts.push(`${skinDescriptions[settings.skinDetail]}.`);
+  }
+
+  // Eye detail
+  if (settings.eyeDetail !== 'auto') {
+    const eyeDescriptions: Record<string, string> = {
+      'ultra': 'Ultra-detailed eyes with visible iris patterns, reflections, catch lights, and micro-detail in the pupils',
+      'high': 'Highly detailed eyes with clear iris detail and natural reflections',
+      'medium': 'Standard realistic eye detail',
+      'low': 'Simplified eye rendering',
+    };
+    parts.push(`${eyeDescriptions[settings.eyeDetail]}.`);
+  }
+
+  // Background
+  if (settings.backgroundImage) {
+    parts.push("Use the provided background image as the scene background.");
+  }
+  if (settings.backgroundText) {
+    parts.push(`Background/setting: ${settings.backgroundText}.`);
+  }
+
+  // Characters
+  characters.forEach((char, i) => {
+    const label = char.label || `Person ${i + 1}`;
+    const charParts: string[] = [`[${label}]:`];
+
+    if (char.faceImage) {
+      charParts.push("Use the provided face reference image to recreate this person's exact facial features, skin tone, and details.");
+    }
+
+    // Hairstyle
+    if (char.hairstyleOption === 'default') {
+      charParts.push("Keep the exact hairstyle from the face reference image.");
+    } else if (char.hairstyleOption === 'custom-text' && char.hairstyleText) {
+      charParts.push(`Hairstyle: ${char.hairstyleText}.`);
+    } else if (char.hairstyleOption === 'custom-image') {
+      charParts.push("Use the provided hairstyle reference image.");
+    }
+
+    // Clothing
+    if (char.clothingImage) {
+      charParts.push("Dress this person in the exact clothing shown in the provided clothing reference image.");
+    }
+    if (char.clothingText) {
+      charParts.push(`Clothing: ${char.clothingText}.`);
+    }
+
+    // Body
+    charParts.push(`Body proportions: chest size ${char.chestSize}, butt size ${char.buttSize}, stomach size ${char.stomachSize}.`);
+
+    // Expression
+    if (char.expressionPreset === 'default') {
+      charParts.push("Keep the natural expression from the face reference.");
+    } else if (char.expressionPreset === 'custom' && char.customExpression) {
+      charParts.push(`Expression: ${char.customExpression}.`);
+    } else {
+      charParts.push(`Expression: ${char.expressionPreset}.`);
+    }
+
+    // Pose preset
+    if (char.posePreset !== 'none' && char.posePreset !== 'custom') {
+      const poseDescriptions: Record<string, string> = {
+        'standing': 'standing upright',
+        'sitting': 'sitting down',
+        'lying-down': 'lying down',
+        'kneeling': 'kneeling',
+        'crawling': 'crawling on the ground',
+        'squatting': 'squatting down',
+        'leaning': 'leaning seductively',
+        'arched-back': 'with arched back pose',
+        'on-all-fours': 'on all fours position',
+        'side-lying': 'lying on side',
+        'bent-over': 'bent over',
+        'looking-back': 'looking back over shoulder',
+        'hands-and-knees': 'on hands and knees',
+      };
+      charParts.push(`Pose: ${poseDescriptions[char.posePreset] || char.posePreset}.`);
+    }
+
+    // Action
+    if (char.actionPrompt) {
+      charParts.push(`Action/pose: ${char.actionPrompt}.`);
+    }
+
+    // Pose reference
+    if (char.poseReferenceImage) {
+      charParts.push("Match the body pose from the provided pose reference image.");
+    }
+
+    // Props
+    char.props.forEach((prop) => {
+      if (prop.name) {
+        charParts.push(`Prop: ${prop.name}${prop.placement ? ` placed ${prop.placement}` : ''}.${prop.imageData ? ' Use the provided prop reference image.' : ''}`);
+      }
+    });
+
+    parts.push(charParts.join(" "));
+  });
+
+  return parts.join("\n\n");
+}
+
+function collectReferenceImages(characters: CharacterConfig[], settings: GenerationSettings): string[] {
+  const images: string[] = [];
+
+  if (settings.backgroundImage) images.push(settings.backgroundImage);
+
+  characters.forEach((char) => {
+    if (char.faceImage) images.push(char.faceImage);
+    if (char.clothingImage) images.push(char.clothingImage);
+    if (char.poseReferenceImage) images.push(char.poseReferenceImage);
+    if (char.hairstyleOption === 'custom-image' && char.hairstyleImage) images.push(char.hairstyleImage);
+    char.props.forEach((prop) => {
+      if (prop.imageData) images.push(prop.imageData);
+    });
+  });
+
+  return images;
+}
+
+export function useImageGeneration() {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+
+  const generate = useCallback(async (characters: CharacterConfig[], settings: GenerationSettings) => {
+    setIsGenerating(true);
+    try {
+      const prompt = buildPrompt(characters, settings);
+      const referenceImages = collectReferenceImages(characters, settings);
+
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt, model: settings.model, referenceImages },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      if (data?.imageUrl) {
+        const newImage: GeneratedImage = {
+          id: crypto.randomUUID(),
+          imageData: data.imageUrl,
+          prompt,
+          characters: JSON.parse(JSON.stringify(characters)),
+          settings: JSON.parse(JSON.stringify(settings)),
+          timestamp: Date.now(),
+        };
+        setGeneratedImages((prev) => [newImage, ...prev]);
+        toast.success('Image generated!');
+      } else {
+        toast.error('No image was returned. Try adjusting your prompt.');
+      }
+    } catch (err: any) {
+      console.error('Generation error:', err);
+      toast.error(err.message || 'Failed to generate image');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, []);
+
+  return { isGenerating, generatedImages, generate, setGeneratedImages };
+}
