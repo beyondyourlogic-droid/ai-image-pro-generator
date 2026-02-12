@@ -132,10 +132,12 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
     }
     charParts.push(`Body proportions: chest size ${char.chestSize}, butt size ${char.buttSize}, stomach size ${char.stomachSize}.`);
 
-    // Height
-    const heightFt = Math.floor(char.height / 12);
-    const heightIn = char.height % 12;
-    charParts.push(`Height: approximately ${heightFt} feet ${heightIn} inches tall.`);
+    // Height (only if enabled)
+    if (char.heightEnabled) {
+      const heightFt = Math.floor(char.height / 12);
+      const heightIn = char.height % 12;
+      charParts.push(`Height: approximately ${heightFt} feet ${heightIn} inches tall.`);
+    }
 
     // Expression
     if (char.expressionPreset === 'default') {
@@ -185,8 +187,8 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
 
     // Distinguishing marks
     char.distinguishingMarks.forEach((mark) => {
-      if (mark.description || mark.bodyLocation) {
-        charParts.push(`Distinguishing ${mark.type}: ${mark.description || mark.type}${mark.bodyLocation ? ` located on ${mark.bodyLocation}` : ''}.${mark.imageData ? ' Use the provided reference image for this mark.' : ''}`);
+      if (mark.description || mark.imageData) {
+        charParts.push(`Distinguishing ${mark.type}: ${mark.description || mark.type}.${mark.imageData ? ' A reference image is provided showing the exact appearance and placement on the body — replicate it in the same location.' : ''}`);
       }
     });
 

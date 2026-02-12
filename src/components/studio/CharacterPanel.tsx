@@ -144,7 +144,7 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
   };
 
   const addMark = () => {
-    const mark: DistinguishingMark = { id: crypto.randomUUID(), type: 'tattoo', description: '', imageData: null, bodyLocation: '' };
+    const mark: DistinguishingMark = { id: crypto.randomUUID(), type: 'tattoo', description: '', imageData: null };
     update('distinguishingMarks', [...character.distinguishingMarks, mark]);
     setMarksExpanded(true);
   };
@@ -307,26 +307,38 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
 
           {/* Height */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Ruler className="w-3 h-3" /> Height <span className="text-muted-foreground/60">(optional)</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-foreground w-10">{formatHeight(character.height)}</span>
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="range"
-                min={48}
-                max={78}
-                step={1}
-                value={character.height}
-                onChange={(e) => update('height', Number(e.target.value))}
-                className="flex-1 h-2 appearance-none rounded-full cursor-pointer bg-secondary"
+                type="checkbox"
+                checked={character.heightEnabled}
+                onChange={(e) => update('heightEnabled', e.target.checked)}
+                className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
               />
-            </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground">
-              <span>4'0"</span>
-              <span>5'3"</span>
-              <span>6'6"</span>
-            </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Ruler className="w-3 h-3" /> Specify Height
+              </span>
+            </label>
+            {character.heightEnabled && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-foreground w-10">{formatHeight(character.height)}</span>
+                  <input
+                    type="range"
+                    min={48}
+                    max={78}
+                    step={1}
+                    value={character.height}
+                    onChange={(e) => update('height', Number(e.target.value))}
+                    className="flex-1 h-2 appearance-none rounded-full cursor-pointer bg-secondary"
+                  />
+                </div>
+                <div className="flex justify-between text-[9px] text-muted-foreground">
+                  <span>4'0"</span>
+                  <span>5'3"</span>
+                  <span>6'6"</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Skin Tone */}
@@ -503,12 +515,6 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
                     placeholder="Description (e.g. dragon tattoo, heart-shaped birthmark)"
                     value={mark.description}
                     onChange={(e) => updateMark(mark.id, { description: e.target.value })}
-                  />
-                  <input
-                    className="w-full bg-secondary border border-border rounded px-1.5 py-1 text-[11px] text-foreground outline-none"
-                    placeholder="Body location (e.g. left forearm, right shoulder blade)"
-                    value={mark.bodyLocation}
-                    onChange={(e) => updateMark(mark.id, { bodyLocation: e.target.value })}
                   />
                 </div>
                 <button onClick={() => removeMark(mark.id)} className="p-0.5 hover:bg-destructive/20 rounded">
