@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2, Palette } from 'lucide-react';
-import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop, SkinTone } from '@/types/studio';
+import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2, Palette, Ruler } from 'lucide-react';
+import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop, SkinTone, DistinguishingMark } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -86,6 +86,7 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
   const [propsExpanded, setPropsExpanded] = useState(false);
+  const [marksExpanded, setMarksExpanded] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedFace, setEnhancedFace] = useState<string | null>(null);
 
@@ -142,6 +143,26 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
     update('props', character.props.filter((p) => p.id !== id));
   };
 
+  const addMark = () => {
+    const mark: DistinguishingMark = { id: crypto.randomUUID(), type: 'tattoo', description: '', imageData: null, bodyLocation: '' };
+    update('distinguishingMarks', [...character.distinguishingMarks, mark]);
+    setMarksExpanded(true);
+  };
+
+  const updateMark = (id: string, changes: Partial<DistinguishingMark>) => {
+    update('distinguishingMarks', character.distinguishingMarks.map((m) => (m.id === id ? { ...m, ...changes } : m)));
+  };
+
+  const removeMark = (id: string) => {
+    update('distinguishingMarks', character.distinguishingMarks.filter((m) => m.id !== id));
+  };
+
+  const formatHeight = (inches: number) => {
+    const ft = Math.floor(inches / 12);
+    const inc = inches % 12;
+    return `${ft}'${inc}"`;
+  };
+
   return (
     <div className="border border-border rounded-lg bg-card overflow-hidden animate-fade-in">
       {/* Header */}
@@ -174,7 +195,10 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
         <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
           {/* Core Images */}
           <div className="grid grid-cols-2 gap-2">
-            <ImageUpload label="Face" value={character.faceImage} onChange={(v) => { update('faceImage', v); setEnhancedFace(null); }} />
+            <ImageUpload label="Face (Front)" value={character.faceImage} onChange={(v) => { update('faceImage', v); setEnhancedFace(null); }} />
+            <ImageUpload label="Face (Side)" value={character.sideProfileImage} onChange={(v) => update('sideProfileImage', v)} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <ImageUpload label="Clothing" value={character.clothingImage} onChange={(v) => update('clothingImage', v)} />
           </div>
           {/* Preserve Exact Head Toggle */}
@@ -279,6 +303,30 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             <SizeSelector label="Chest" value={character.chestSize} onChange={(v) => update('chestSize', v)} />
             <SizeSelector label="Butt" value={character.buttSize} onChange={(v) => update('buttSize', v)} />
             <SizeSelector label="Stomach" value={character.stomachSize} onChange={(v) => update('stomachSize', v)} />
+          </div>
+
+          {/* Height */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Ruler className="w-3 h-3" /> Height <span className="text-muted-foreground/60">(optional)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-foreground w-10">{formatHeight(character.height)}</span>
+              <input
+                type="range"
+                min={48}
+                max={78}
+                step={1}
+                value={character.height}
+                onChange={(e) => update('height', Number(e.target.value))}
+                className="flex-1 h-2 appearance-none rounded-full cursor-pointer bg-secondary"
+              />
+            </div>
+            <div className="flex justify-between text-[9px] text-muted-foreground">
+              <span>4'0"</span>
+              <span>5'3"</span>
+              <span>6'6"</span>
+            </div>
           </div>
 
           {/* Skin Tone */}
@@ -412,6 +460,58 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
                   />
                 </div>
                 <button onClick={() => removeProp(prop.id)} className="p-0.5 hover:bg-destructive/20 rounded">
+                  <X className="w-3 h-3 text-destructive" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Distinguishing Marks */}
+          <div className="space-y-1.5">
+            <div
+              className="flex items-center gap-1 cursor-pointer"
+              onClick={() => setMarksExpanded(!marksExpanded)}
+            >
+              {marksExpanded ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer">
+                Marks / Tattoos ({character.distinguishingMarks.length})
+              </label>
+              <button
+                onClick={(e) => { e.stopPropagation(); addMark(); }}
+                className="ml-auto p-0.5 hover:bg-secondary rounded transition-colors"
+              >
+                <Plus className="w-3 h-3 text-primary" />
+              </button>
+            </div>
+            {marksExpanded && character.distinguishingMarks.map((mark) => (
+              <div key={mark.id} className="flex gap-2 items-start bg-secondary/50 rounded-md p-2">
+                <ImageUpload label="" value={mark.imageData} onChange={(v) => updateMark(mark.id, { imageData: v })} compact />
+                <div className="flex-1 space-y-1">
+                  <select
+                    className="w-full bg-secondary border border-border rounded px-1.5 py-1 text-[11px] text-foreground outline-none"
+                    value={mark.type}
+                    onChange={(e) => updateMark(mark.id, { type: e.target.value as DistinguishingMark['type'] })}
+                  >
+                    <option value="tattoo">Tattoo</option>
+                    <option value="birthmark">Birthmark</option>
+                    <option value="scar">Scar</option>
+                    <option value="piercing">Piercing</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input
+                    className="w-full bg-secondary border border-border rounded px-1.5 py-1 text-[11px] text-foreground outline-none"
+                    placeholder="Description (e.g. dragon tattoo, heart-shaped birthmark)"
+                    value={mark.description}
+                    onChange={(e) => updateMark(mark.id, { description: e.target.value })}
+                  />
+                  <input
+                    className="w-full bg-secondary border border-border rounded px-1.5 py-1 text-[11px] text-foreground outline-none"
+                    placeholder="Body location (e.g. left forearm, right shoulder blade)"
+                    value={mark.bodyLocation}
+                    onChange={(e) => updateMark(mark.id, { bodyLocation: e.target.value })}
+                  />
+                </div>
+                <button onClick={() => removeMark(mark.id)} className="p-0.5 hover:bg-destructive/20 rounded">
                   <X className="w-3 h-3 text-destructive" />
                 </button>
               </div>

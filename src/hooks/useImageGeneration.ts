@@ -92,6 +92,10 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
       }
     }
 
+    if (char.sideProfileImage) {
+      charParts.push("A side profile reference image is also provided — use it for accurate nose shape, jawline, ear placement, and hair appearance from the side angle.");
+    }
+
     // Hairstyle
     if (char.hairstyleOption === 'default') {
       charParts.push("Keep the exact hairstyle from the face reference image.");
@@ -127,6 +131,11 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
       charParts.push(`Eye color: exactly ${char.eyeColor}.`);
     }
     charParts.push(`Body proportions: chest size ${char.chestSize}, butt size ${char.buttSize}, stomach size ${char.stomachSize}.`);
+
+    // Height
+    const heightFt = Math.floor(char.height / 12);
+    const heightIn = char.height % 12;
+    charParts.push(`Height: approximately ${heightFt} feet ${heightIn} inches tall.`);
 
     // Expression
     if (char.expressionPreset === 'default') {
@@ -174,6 +183,13 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
       }
     });
 
+    // Distinguishing marks
+    char.distinguishingMarks.forEach((mark) => {
+      if (mark.description || mark.bodyLocation) {
+        charParts.push(`Distinguishing ${mark.type}: ${mark.description || mark.type}${mark.bodyLocation ? ` located on ${mark.bodyLocation}` : ''}.${mark.imageData ? ' Use the provided reference image for this mark.' : ''}`);
+      }
+    });
+
     parts.push(charParts.join(" "));
   });
 
@@ -187,11 +203,15 @@ function collectReferenceImages(characters: CharacterConfig[], settings: Generat
 
   characters.forEach((char) => {
     if (char.faceImage) images.push(char.faceImage);
+    if (char.sideProfileImage) images.push(char.sideProfileImage);
     if (char.clothingImage) images.push(char.clothingImage);
     if (char.poseReferenceImage) images.push(char.poseReferenceImage);
     if (char.hairstyleOption === 'custom-image' && char.hairstyleImage) images.push(char.hairstyleImage);
     char.props.forEach((prop) => {
       if (prop.imageData) images.push(prop.imageData);
+    });
+    char.distinguishingMarks.forEach((mark) => {
+      if (mark.imageData) images.push(mark.imageData);
     });
   });
 
