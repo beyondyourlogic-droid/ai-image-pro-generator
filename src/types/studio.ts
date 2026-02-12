@@ -21,7 +21,6 @@ export interface DistinguishingMark {
   type: 'tattoo' | 'birthmark' | 'scar' | 'piercing' | 'other';
   description: string;
   imageData: string | null;
-  bodyLocation: string;
 }
 
 export interface CharacterConfig {
@@ -49,7 +48,8 @@ export interface CharacterConfig {
   eyeColorImage: string | null;
   preserveExactHead: boolean;
   sideProfileImage: string | null;
-  height: number; // in inches, 48-78 (4ft to 6ft6)
+  heightEnabled: boolean;
+  height: number;
   distinguishingMarks: DistinguishingMark[];
   props: Prop[];
 }
@@ -102,7 +102,8 @@ export function createDefaultCharacter(id: string, index: number): CharacterConf
     eyeColorImage: null,
     preserveExactHead: false,
     sideProfileImage: null,
-    height: 66, // 5'6" default
+    heightEnabled: false,
+    height: 66,
     distinguishingMarks: [],
     props: [],
   };
