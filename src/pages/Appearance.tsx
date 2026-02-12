@@ -127,17 +127,17 @@ export default function Appearance() {
 
   const buildPrompt = () => {
     const parts: string[] = [
-      'Edit this photo of a person. Keep the person, pose, background, and clothing EXACTLY the same. ONLY change the following specific features:'
+      'Edit this photo of a person. You MUST keep EVERYTHING about the person EXACTLY the same: same face, same facial features, same expression, same body, same pose, same clothing, same background, same lighting, same composition. The ONLY thing you are allowed to change is what is explicitly listed below. Everything else MUST remain pixel-perfect identical.'
     ];
-    if (skinColor) parts.push(`- Change their skin color to: ${skinColor}.`);
-    if (hairColor) parts.push(`- Change their hair color to: ${colorName(hairColor, HAIR_LABELS)} (${hairColor}).`);
-    if (hairRefImage) parts.push('- Change their hair to match the color and style shown in the provided hair reference image.');
-    if (eyeColor) parts.push(`- Change their eye color to: ${colorName(eyeColor, EYE_LABELS)} (${eyeColor}).`);
-    if (eyeRefImage) parts.push('- Change their eyes to match the color shown in the provided eye reference image.');
+    if (skinColor) parts.push(`- Change ONLY their skin color to: ${skinColor}. Do NOT change their face shape, features, hair, eyes, or anything else.`);
+    if (hairColor) parts.push(`- Change ONLY their hair color to: ${colorName(hairColor, HAIR_LABELS)} (${hairColor}). Do NOT change hairstyle, face, eyes, skin, or anything else.`);
+    if (hairRefImage) parts.push('- Change ONLY their hair to match the color and style shown in the provided hair reference image. Do NOT change face, eyes, skin, or anything else.');
+    if (eyeColor) parts.push(`- Change ONLY their eye color (iris color) to: ${colorName(eyeColor, EYE_LABELS)} (${eyeColor}). Do NOT change the eye shape, eyelashes, eyebrows, face, skin, hair, or ANY other feature. ONLY the iris color should change.`);
+    if (eyeRefImage) parts.push('- Change ONLY their eye color (iris color) to match the color shown in the provided eye reference image. Do NOT change the eye shape, eyelashes, eyebrows, face, skin, hair, or anything else. ONLY the iris color.');
     if (!skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
       parts.push('No changes specified — return the image as-is.');
     }
-    parts.push('Do NOT change anything else about the person — same face, same expression, same body, same clothing, same background. Output a single photorealistic image.');
+    parts.push('CRITICAL: Do NOT change anything other than what is explicitly listed above. The person must look identical in every other way. Output a single photorealistic image.');
     return parts.join('\n');
   };
 

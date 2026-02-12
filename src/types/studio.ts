@@ -27,6 +27,7 @@ export interface CharacterConfig {
   id: string;
   label: string;
   faceImage: string | null;
+  additionalFaceImages: string[];
   clothingImage: string | null;
   clothingText: string;
   poseReferenceImage: string | null;
@@ -66,6 +67,7 @@ export interface GenerationSettings {
   skinDetail: DetailLevel;
   eyeDetail: DetailLevel;
   confineToBackground: boolean;
+  imageCount: number;
 }
 
 export interface GeneratedImage {
@@ -82,6 +84,7 @@ export function createDefaultCharacter(id: string, index: number): CharacterConf
     id,
     label: `Person ${index + 1}`,
     faceImage: null,
+    additionalFaceImages: [],
     clothingImage: null,
     clothingText: '',
     poseReferenceImage: null,

@@ -248,6 +248,29 @@ export function GenerationSettingsPanel({ settings, onChange }: GenerationSettin
           onChange={(e) => update('backgroundText', e.target.value)}
         />
       </div>
+
+      {/* Image Count */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Images to Generate</label>
+        </div>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4].map((n) => (
+            <button
+              key={n}
+              onClick={() => update('imageCount', n)}
+              className={`flex-1 py-1 text-[10px] uppercase rounded-md transition-colors font-medium ${
+                (settings.imageCount || 1) === n
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
