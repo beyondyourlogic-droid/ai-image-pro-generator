@@ -18,6 +18,7 @@ const defaultSettings: GenerationSettings = {
   skinDetail: 'auto',
   eyeDetail: 'auto',
   confineToBackground: false,
+  imageCount: 1,
 };
 
 export default function Index() {
@@ -45,7 +46,10 @@ export default function Index() {
   }, []);
 
   const handleGenerate = () => {
-    generate(characters, settings);
+    const count = settings.imageCount || 1;
+    for (let i = 0; i < count; i++) {
+      generate(characters, settings);
+    }
   };
 
   return (

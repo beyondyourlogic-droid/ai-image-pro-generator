@@ -198,6 +198,55 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             <ImageUpload label="Face (Front)" value={character.faceImage} onChange={(v) => { update('faceImage', v); setEnhancedFace(null); }} />
             <ImageUpload label="Face (Side)" value={character.sideProfileImage} onChange={(v) => update('sideProfileImage', v)} />
           </div>
+
+          {/* Additional Face References */}
+          {character.faceImage && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Additional Face Refs</label>
+                {(character.additionalFaceImages?.length || 0) < 4 && (
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const result = reader.result as string;
+                          update('additionalFaceImages', [...(character.additionalFaceImages || []), result]);
+                        };
+                        reader.readAsDataURL(file);
+                      };
+                      input.click();
+                    }}
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase font-semibold text-primary hover:bg-primary/10 rounded-md transition-colors"
+                  >
+                    <Plus className="w-3 h-3" /> Add
+                  </button>
+                )}
+              </div>
+              {character.additionalFaceImages && character.additionalFaceImages.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {character.additionalFaceImages.map((img, idx) => (
+                    <div key={idx} className="relative group">
+                      <img src={img} alt={`Face ref ${idx + 2}`} className="w-12 h-12 rounded-md object-cover border border-border" />
+                      <button
+                        onClick={() => update('additionalFaceImages', character.additionalFaceImages.filter((_, i) => i !== idx))}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[9px] text-muted-foreground">Add more angles for better accuracy (max 4)</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <ImageUpload label="Clothing" value={character.clothingImage} onChange={(v) => update('clothingImage', v)} />
           </div>

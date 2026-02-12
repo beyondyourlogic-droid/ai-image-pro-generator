@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CharacterConfig, GeneratedImage, GenerationSettings } from '@/types/studio';
 import { toast } from 'sonner';
@@ -94,6 +94,10 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
       } else {
         charParts.push("Use the provided face reference image to recreate this person's exact facial features, skin tone, and details.");
       }
+    }
+
+    if (char.additionalFaceImages && char.additionalFaceImages.length > 0) {
+      charParts.push(`${char.additionalFaceImages.length} additional face reference image(s) are provided from different angles — use all of them together to build a more accurate understanding of this person's facial features, structure, and proportions.`);
     }
 
     if (char.sideProfileImage) {
@@ -209,6 +213,9 @@ function collectReferenceImages(characters: CharacterConfig[], settings: Generat
 
   characters.forEach((char) => {
     if (char.faceImage) images.push(char.faceImage);
+    if (char.additionalFaceImages) {
+      char.additionalFaceImages.forEach((img) => images.push(img));
+    }
     if (char.sideProfileImage) images.push(char.sideProfileImage);
     if (char.clothingImage) images.push(char.clothingImage);
     if (char.poseReferenceImage) images.push(char.poseReferenceImage);
@@ -224,29 +231,55 @@ function collectReferenceImages(characters: CharacterConfig[], settings: Generat
   return images;
 }
 
-const STORAGE_KEY = 'ai-studio-history';
-
-function loadHistory(): GeneratedImage[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(images: GeneratedImage[]) {
-  try {
-    // Keep last 50 images to avoid storage limits
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, 50)));
-  } catch {
-    // silently fail
-  }
-}
-
 export function useImageGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(loadHistory);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load from database on mount
+  useEffect(() => {
+    loadFromDb();
+  }, []);
+
+  const loadFromDb = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('generation_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      if (data) {
+        setGeneratedImages(data.map((row: any) => ({
+          id: row.id,
+          imageData: row.image_data,
+          prompt: row.prompt,
+          characters: row.characters as CharacterConfig[],
+          settings: row.settings as GenerationSettings,
+          timestamp: new Date(row.created_at).getTime(),
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to load history from DB:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveToDb = async (image: GeneratedImage) => {
+    try {
+      await supabase.from('generation_history').insert({
+        id: image.id,
+        image_data: image.imageData,
+        prompt: image.prompt,
+        characters: JSON.parse(JSON.stringify(image.characters)),
+        settings: JSON.parse(JSON.stringify(image.settings)),
+        created_at: new Date(image.timestamp).toISOString(),
+      });
+    } catch (err) {
+      console.error('Failed to save to DB:', err);
+    }
+  };
 
   const generate = useCallback(async (characters: CharacterConfig[], settings: GenerationSettings) => {
     setIsGenerating(true);
@@ -274,11 +307,8 @@ export function useImageGeneration() {
           settings: JSON.parse(JSON.stringify(settings)),
           timestamp: Date.now(),
         };
-        setGeneratedImages((prev) => {
-          const next = [newImage, ...prev];
-          saveHistory(next);
-          return next;
-        });
+        setGeneratedImages((prev) => [newImage, ...prev]);
+        saveToDb(newImage);
         toast.success('Image generated!');
       } else {
         toast.error('No image was returned. Try adjusting your prompt.');
@@ -291,10 +321,16 @@ export function useImageGeneration() {
     }
   }, []);
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
     setGeneratedImages([]);
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      // Delete all rows
+      const { error } = await supabase.from('generation_history').delete().gte('created_at', '1970-01-01');
+      if (error) console.error('Failed to clear DB history:', error);
+    } catch (err) {
+      console.error('Failed to clear history:', err);
+    }
   }, []);
 
-  return { isGenerating, generatedImages, generate, setGeneratedImages, clearHistory };
+  return { isGenerating, isLoading, generatedImages, generate, setGeneratedImages, clearHistory };
 }
