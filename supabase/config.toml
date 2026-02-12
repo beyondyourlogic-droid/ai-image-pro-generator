@@ -2,3 +2,12 @@ project_id = "aiykjnmpsdszarjycykc"
 
 [functions.enhance-face]
 verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.retouch-image]
+verify_jwt = false
+
+[functions.edit-clothing]
+verify_jwt = false

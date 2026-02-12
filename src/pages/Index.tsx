@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Wand2, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Wand2, Loader2, Trash2, RotateCcw } from 'lucide-react';
 import { CharacterConfig, GenerationSettings, GeneratedImage, createDefaultCharacter } from '@/types/studio';
 import { CharacterPanel } from '@/components/studio/CharacterPanel';
 import { GenerationSettingsPanel } from '@/components/studio/GenerationSettings';
@@ -17,6 +17,7 @@ const defaultSettings: GenerationSettings = {
   lighting: 'auto',
   skinDetail: 'auto',
   eyeDetail: 'auto',
+  confineToBackground: false,
 };
 
 export default function Index() {
@@ -94,8 +95,8 @@ export default function Index() {
           </div>
         </div>
 
-        {/* Generate Button */}
-        <div className="p-3 border-t border-border">
+        {/* Bottom Buttons */}
+        <div className="p-3 border-t border-border space-y-2">
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
@@ -112,6 +113,15 @@ export default function Index() {
                 Generate Image
               </>
             )}
+          </button>
+          <button
+            onClick={() => {
+              setSettings(defaultSettings);
+              setCharacters([createDefaultCharacter(crypto.randomUUID(), 0)]);
+            }}
+            className="w-full py-1.5 rounded-lg bg-secondary text-secondary-foreground font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-secondary/80 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" /> Reset All Settings
           </button>
         </div>
       </aside>

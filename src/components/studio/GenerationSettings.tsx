@@ -1,6 +1,9 @@
-import { Camera, Ratio, Sparkles, Sun, Eye, Scan } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, Ratio, Sparkles, Sun, Eye, Scan, Loader2 } from 'lucide-react';
 import { AIModel, AspectRatio, CameraAngle, LightingOption, DetailLevel, GenerationSettings as Settings } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface GenerationSettingsProps {
   settings: Settings;
@@ -97,8 +100,30 @@ function ChipSelector<T extends string>({ icon, label, options, value, onChange 
 }
 
 export function GenerationSettingsPanel({ settings, onChange }: GenerationSettingsProps) {
+  const [isEnhancingBg, setIsEnhancingBg] = useState(false);
+
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     onChange({ ...settings, [key]: value });
+  };
+
+  const enhanceBackground = async () => {
+    if (!settings.backgroundImage) return;
+    setIsEnhancingBg(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enhance-face', {
+        body: { imageData: settings.backgroundImage },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      if (data?.imageUrl) {
+        update('backgroundImage', data.imageUrl);
+        toast.success('Background enhanced!');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to enhance background');
+    } finally {
+      setIsEnhancingBg(false);
+    }
   };
 
   return (
@@ -190,6 +215,30 @@ export function GenerationSettingsPanel({ settings, onChange }: GenerationSettin
 
       {/* Background */}
       <ImageUpload label="Background Image" value={settings.backgroundImage} onChange={(v) => update('backgroundImage', v)} />
+      {settings.backgroundImage && (
+        <div className="space-y-2">
+          <button
+            onClick={enhanceBackground}
+            disabled={isEnhancingBg}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {isEnhancingBg ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
+            ) : (
+              <><Sparkles className="w-3 h-3" /> Enhance Background (HD)</>
+            )}
+          </button>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.confineToBackground}
+              onChange={(e) => update('confineToBackground', e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+            />
+            <span className="text-xs font-medium text-foreground">Confine character to background (no extending/zooming out)</span>
+          </label>
+        </div>
+      )}
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Background Description</label>
         <input

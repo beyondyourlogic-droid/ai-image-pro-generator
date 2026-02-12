@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, X, Palette, Eye, Scissors, Wand2, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, X, Palette, Eye, Scissors, Wand2, Loader2, Download, Eraser, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImageUpload } from '@/components/studio/ImageUpload';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,8 +105,11 @@ interface EditResult {
   timestamp: number;
 }
 
+type EditorMode = 'appearance' | 'retouch';
+
 export default function Appearance() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<EditorMode>('appearance');
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [skinColor, setSkinColor] = useState('');
   const [hairColor, setHairColor] = useState('');
@@ -134,32 +137,46 @@ export default function Appearance() {
 
   const handleGenerate = async () => {
     if (!sourceImage) { toast.error('Upload a source image first'); return; }
-    if (!skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
+    if (mode === 'appearance' && !skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
       toast.error('Select at least one change'); return;
     }
     setIsGenerating(true);
     try {
-      const referenceImages = [sourceImage];
-      if (hairRefImage) referenceImages.push(hairRefImage);
-      if (eyeRefImage) referenceImages.push(eyeRefImage);
-
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: {
-          prompt: buildPrompt(),
-          model: 'google/gemini-3-pro-image-preview',
-          referenceImages,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
-      if (data?.imageUrl) {
-        setResults(prev => [{ id: crypto.randomUUID(), imageUrl: data.imageUrl, timestamp: Date.now() }, ...prev]);
-        toast.success('Image edited successfully!');
+      if (mode === 'retouch') {
+        const { data, error } = await supabase.functions.invoke('retouch-image', {
+          body: { imageData: sourceImage },
+        });
+        if (error) throw error;
+        if (data?.error) { toast.error(data.error); return; }
+        if (data?.imageUrl) {
+          setResults(prev => [{ id: crypto.randomUUID(), imageUrl: data.imageUrl, timestamp: Date.now() }, ...prev]);
+          toast.success('Image retouched successfully!');
+        } else {
+          toast.error('No image returned from AI');
+        }
       } else {
-        toast.error('No image returned from AI');
+        const referenceImages = [sourceImage];
+        if (hairRefImage) referenceImages.push(hairRefImage);
+        if (eyeRefImage) referenceImages.push(eyeRefImage);
+
+        const { data, error } = await supabase.functions.invoke('generate-image', {
+          body: {
+            prompt: buildPrompt(),
+            model: 'google/gemini-3-pro-image-preview',
+            referenceImages,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) { toast.error(data.error); return; }
+        if (data?.imageUrl) {
+          setResults(prev => [{ id: crypto.randomUUID(), imageUrl: data.imageUrl, timestamp: Date.now() }, ...prev]);
+          toast.success('Image edited successfully!');
+        } else {
+          toast.error('No image returned from AI');
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to edit image');
+      toast.error(err.message || 'Failed to process image');
     } finally {
       setIsGenerating(false);
     }
@@ -172,7 +189,7 @@ export default function Appearance() {
     link.click();
   };
 
-  const hasChanges = !!(skinColor || hairColor || eyeColor || hairRefImage || eyeRefImage);
+  const hasChanges = mode === 'retouch' || !!(skinColor || hairColor || eyeColor || hairRefImage || eyeRefImage);
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
@@ -184,8 +201,28 @@ export default function Appearance() {
           </button>
           <div>
             <h1 className="text-sm font-bold text-foreground tracking-tight">Appearance Editor</h1>
-            <p className="text-[10px] text-muted-foreground">Edit skin, hair & eye colors with AI</p>
+            <p className="text-[10px] text-muted-foreground">Edit appearance & retouch with AI</p>
           </div>
+        </div>
+
+        {/* Mode Tabs */}
+        <div className="px-3 pt-3 flex gap-1">
+          <button
+            onClick={() => setMode('appearance')}
+            className={`flex-1 py-1.5 text-[11px] uppercase font-semibold rounded-md transition-colors flex items-center justify-center gap-1 ${
+              mode === 'appearance' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+            }`}
+          >
+            <Palette className="w-3 h-3" /> Appearance
+          </button>
+          <button
+            onClick={() => setMode('retouch')}
+            className={`flex-1 py-1.5 text-[11px] uppercase font-semibold rounded-md transition-colors flex items-center justify-center gap-1 ${
+              mode === 'retouch' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+            }`}
+          >
+            <Eraser className="w-3 h-3" /> Retouch
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-4">
@@ -195,46 +232,60 @@ export default function Appearance() {
             <ImageUpload label="" value={sourceImage} onChange={setSourceImage} />
           </div>
 
-          {/* Skin Color */}
-          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Palette className="w-3.5 h-3.5 text-primary" />
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Skin Color</h3>
-              {skinColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: skinColor }} />}
+          {mode === 'retouch' ? (
+            <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Eraser className="w-3.5 h-3.5 text-primary" />
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Retouch</h3>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Automatically removes blemishes, acne, spots, scars, dark circles, and skin imperfections while keeping the image looking natural and photorealistic.
+              </p>
             </div>
-            <ColorGrid colors={SKIN_COLORS} selected={skinColor} onSelect={setSkinColor} />
-            <CustomColorInput value={skinColor} onChange={setSkinColor} />
-          </div>
+          ) : (
+            <>
+              {/* Skin Color */}
+              <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-3.5 h-3.5 text-primary" />
+                  <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Skin Color</h3>
+                  {skinColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: skinColor }} />}
+                </div>
+                <ColorGrid colors={SKIN_COLORS} selected={skinColor} onSelect={setSkinColor} />
+                <CustomColorInput value={skinColor} onChange={setSkinColor} />
+              </div>
 
-          {/* Hair Color */}
-          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Scissors className="w-3.5 h-3.5 text-primary" />
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Hair Color</h3>
-              {hairColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: hairColor }} />}
-            </div>
-            <ColorGrid colors={HAIR_COLORS} selected={hairColor} onSelect={setHairColor} labels={HAIR_LABELS} />
-            <CustomColorInput value={hairColor} onChange={setHairColor} />
-            <div className="pt-1">
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload hair reference</label>
-              <ImageUpload label="" value={hairRefImage} onChange={setHairRefImage} />
-            </div>
-          </div>
+              {/* Hair Color */}
+              <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Scissors className="w-3.5 h-3.5 text-primary" />
+                  <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Hair Color</h3>
+                  {hairColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: hairColor }} />}
+                </div>
+                <ColorGrid colors={HAIR_COLORS} selected={hairColor} onSelect={setHairColor} labels={HAIR_LABELS} />
+                <CustomColorInput value={hairColor} onChange={setHairColor} />
+                <div className="pt-1">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload hair reference</label>
+                  <ImageUpload label="" value={hairRefImage} onChange={setHairRefImage} />
+                </div>
+              </div>
 
-          {/* Eye Color */}
-          <div className="border border-border rounded-lg bg-card p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Eye className="w-3.5 h-3.5 text-primary" />
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Eye Color</h3>
-              {eyeColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: eyeColor }} />}
-            </div>
-            <ColorGrid colors={EYE_COLORS} selected={eyeColor} onSelect={setEyeColor} labels={EYE_LABELS} />
-            <CustomColorInput value={eyeColor} onChange={setEyeColor} />
-            <div className="pt-1">
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload eye reference</label>
-              <ImageUpload label="" value={eyeRefImage} onChange={setEyeRefImage} />
-            </div>
-          </div>
+              {/* Eye Color */}
+              <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-3.5 h-3.5 text-primary" />
+                  <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Eye Color</h3>
+                  {eyeColor && <span className="ml-auto w-4 h-4 rounded-full border border-border" style={{ backgroundColor: eyeColor }} />}
+                </div>
+                <ColorGrid colors={EYE_COLORS} selected={eyeColor} onSelect={setEyeColor} labels={EYE_LABELS} />
+                <CustomColorInput value={eyeColor} onChange={setEyeColor} />
+                <div className="pt-1">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Or upload eye reference</label>
+                  <ImageUpload label="" value={eyeRefImage} onChange={setEyeRefImage} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Generate Button */}
@@ -245,9 +296,9 @@ export default function Appearance() {
             className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 glow-primary"
           >
             {isGenerating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Editing...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> {mode === 'retouch' ? 'Retouching...' : 'Editing...'}</>
             ) : (
-              <><Wand2 className="w-4 h-4" /> Apply Changes</>
+              <><Wand2 className="w-4 h-4" /> {mode === 'retouch' ? 'Retouch Image' : 'Apply Changes'}</>
             )}
           </button>
         </div>

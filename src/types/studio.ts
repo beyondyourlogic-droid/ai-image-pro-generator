@@ -65,6 +65,7 @@ export interface GenerationSettings {
   lighting: LightingOption;
   skinDetail: DetailLevel;
   eyeDetail: DetailLevel;
+  confineToBackground: boolean;
 }
 
 export interface GeneratedImage {
