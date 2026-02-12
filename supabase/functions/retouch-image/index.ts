@@ -11,10 +11,30 @@ serve(async (req) => {
   }
 
   try {
-    const { imageData } = await req.json();
+    const { imageData, maskData } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const content: any[] = [
+      {
+        type: "text",
+        text: maskData
+          ? "Look at the second image — it is a black and white mask. The WHITE areas indicate the regions that need retouching on the first image. ONLY retouch those specific white-masked areas: remove blemishes, acne, spots, scars, dark circles, and skin imperfections in those regions. Keep ALL other areas completely untouched. Do NOT change facial features, face shape, eye color, hair, expression, pose, clothing, or background. Output a single photorealistic image."
+          : "Retouch this photo. Remove all blemishes, acne, spots, scars, dark circles, uneven skin texture, and any visible skin imperfections. Smooth and even out the skin tone while keeping it looking completely natural and photorealistic. Do NOT change the person's facial features, face shape, eye color, hair, expression, pose, clothing, or background. Only clean up and retouch the skin. Output a single photorealistic image."
+      },
+      {
+        type: "image_url",
+        image_url: { url: imageData },
+      }
+    ];
+
+    if (maskData) {
+      content.push({
+        type: "image_url",
+        image_url: { url: maskData },
+      });
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -24,21 +44,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3-pro-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Retouch this photo. Remove all blemishes, acne, spots, scars, dark circles, uneven skin texture, and any visible skin imperfections. Smooth and even out the skin tone while keeping it looking completely natural and photorealistic. Do NOT change the person's facial features, face shape, eye color, hair, expression, pose, clothing, or background. Only clean up and retouch the skin. Output a single photorealistic image."
-              },
-              {
-                type: "image_url",
-                image_url: { url: imageData },
-              }
-            ],
-          },
-        ],
+        messages: [{ role: "user", content }],
         modalities: ["image", "text"],
       }),
     });
