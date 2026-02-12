@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ArrowLeft, X, Palette, Eye, Scissors, Wand2, Loader2, Download, Eraser, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImageUpload } from '@/components/studio/ImageUpload';
+import { RetouchCanvas } from '@/components/studio/RetouchCanvas';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -118,6 +119,11 @@ export default function Appearance() {
   const [eyeRefImage, setEyeRefImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<EditResult[]>([]);
+  const [maskData, setMaskData] = useState<string>('');
+
+  const handleMaskReady = useCallback((mask: string) => {
+    setMaskData(mask);
+  }, []);
 
   const buildPrompt = () => {
     const parts: string[] = [
@@ -140,11 +146,14 @@ export default function Appearance() {
     if (mode === 'appearance' && !skinColor && !hairColor && !eyeColor && !hairRefImage && !eyeRefImage) {
       toast.error('Select at least one change'); return;
     }
+    if (mode === 'retouch' && !maskData) {
+      toast.error('Paint over the areas you want to retouch'); return;
+    }
     setIsGenerating(true);
     try {
       if (mode === 'retouch') {
         const { data, error } = await supabase.functions.invoke('retouch-image', {
-          body: { imageData: sourceImage },
+          body: { imageData: sourceImage, maskData },
         });
         if (error) throw error;
         if (data?.error) { toast.error(data.error); return; }
@@ -189,7 +198,7 @@ export default function Appearance() {
     link.click();
   };
 
-  const hasChanges = mode === 'retouch' || !!(skinColor || hairColor || eyeColor || hairRefImage || eyeRefImage);
+  const hasChanges = (mode === 'retouch' && !!maskData) || !!(skinColor || hairColor || eyeColor || hairRefImage || eyeRefImage);
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
@@ -233,14 +242,24 @@ export default function Appearance() {
           </div>
 
           {mode === 'retouch' ? (
-            <div className="border border-border rounded-lg bg-card p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Eraser className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Retouch</h3>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Automatically removes blemishes, acne, spots, scars, dark circles, and skin imperfections while keeping the image looking natural and photorealistic.
-              </p>
+            <div className="space-y-3">
+              {sourceImage ? (
+                <RetouchCanvas
+                  imageUrl={sourceImage}
+                  onMaskReady={handleMaskReady}
+                  disabled={isGenerating}
+                />
+              ) : (
+                <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Eraser className="w-3.5 h-3.5 text-primary" />
+                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Retouch</h3>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Upload a source image above, then paint over the areas you want to retouch.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <>
