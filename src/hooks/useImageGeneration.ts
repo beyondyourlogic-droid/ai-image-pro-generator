@@ -73,7 +73,11 @@ function buildPrompt(characters: CharacterConfig[], settings: GenerationSettings
 
   // Background
   if (settings.backgroundImage) {
-    parts.push("Use the provided background image as the scene background.");
+    if (settings.confineToBackground) {
+      parts.push("CRITICAL: Use the provided background image as the scene. Do NOT extend, zoom out, or add any areas beyond what is shown in the background image. Keep the entire scene WITHIN the boundaries of the provided background. The AI may zoom in or crop to fit the character naturally, and may adjust lighting to match, but must NEVER generate additional background areas that don't exist in the original image. Do NOT change the colors, textures, or elements of the background. Place the character in a reasonable, natural position within the existing scene.");
+    } else {
+      parts.push("Use the provided background image as the scene background.");
+    }
   }
   if (settings.backgroundText) {
     parts.push(`Background/setting: ${settings.backgroundText}.`);

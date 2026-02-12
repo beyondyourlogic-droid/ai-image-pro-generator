@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2, Palette, Ruler } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, User, Sparkles, Download, Loader2, Palette, Ruler, Shirt } from 'lucide-react';
 import { CharacterConfig, BodySize, ExpressionPreset, HairstyleOption, PosePreset, Prop, SkinTone, DistinguishingMark } from '@/types/studio';
 import { ImageUpload } from './ImageUpload';
 import { supabase } from '@/integrations/supabase/client';
@@ -369,13 +369,21 @@ export function CharacterPanel({ character, onChange, onRemove, canRemove }: Cha
             </div>
           </div>
 
-          {/* Appearance Editor Link */}
-          <button
-            onClick={() => navigate('/appearance')}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-          >
-            <Palette className="w-3 h-3" /> Appearance Editor (Skin/Hair/Eyes)
-          </button>
+          {/* Editor Links */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => navigate('/appearance')}
+              className="flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Palette className="w-3 h-3" /> Appearance Editor
+            </button>
+            <button
+              onClick={() => navigate('/clothing')}
+              className="flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Shirt className="w-3 h-3" /> Clothing Editor
+            </button>
+          </div>
 
           {/* Expression */}
           <div className="space-y-1.5">
