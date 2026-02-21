@@ -243,21 +243,43 @@ export function useImageGeneration() {
 
   const loadFromDb = async () => {
     try {
-      const { data, error } = await supabase
+      // Only fetch ids and timestamps first (characters/settings JSONB are huge)
+      const { data: indexData, error: indexError } = await supabase
         .from('generation_history')
-        .select('*')
+        .select('id, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
-      if (error) throw error;
-      if (data) {
-        setGeneratedImages(data.map((row: any) => ({
-          id: row.id,
-          imageData: row.image_data,
-          prompt: row.prompt,
-          characters: row.characters as CharacterConfig[],
-          settings: row.settings as GenerationSettings,
-          timestamp: new Date(row.created_at).getTime(),
-        })));
+      if (indexError) throw indexError;
+      if (!indexData || indexData.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(false);
+
+      // Load full rows one at a time to avoid timeout
+      for (const row of indexData) {
+        const { data: fullRow, error: rowError } = await supabase
+          .from('generation_history')
+          .select('*')
+          .eq('id', row.id)
+          .single();
+        if (rowError || !fullRow) {
+          console.error('Failed to load row:', row.id, rowError);
+          continue;
+        }
+        const img: GeneratedImage = {
+          id: fullRow.id,
+          imageData: fullRow.image_data,
+          prompt: fullRow.prompt,
+          characters: fullRow.characters as unknown as CharacterConfig[],
+          settings: fullRow.settings as unknown as GenerationSettings,
+          timestamp: new Date(fullRow.created_at).getTime(),
+        };
+        setGeneratedImages((prev) => {
+          if (prev.some((p) => p.id === img.id)) return prev;
+          return [...prev, img];
+        });
       }
     } catch (err) {
       console.error('Failed to load history from DB:', err);
