@@ -248,7 +248,7 @@ export function useImageGeneration() {
         .from('generation_history')
         .select('id, created_at')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
       if (indexError) throw indexError;
       if (!indexData || indexData.length === 0) {
         setIsLoading(false);
