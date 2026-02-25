@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Download } from 'lucide-react';
 
 interface ImageUploadProps {
   label: string;
@@ -25,16 +25,32 @@ export function ImageUpload({ label, value, onChange, compact = false }: ImageUp
     if (file && file.type.startsWith('image/')) handleFile(file);
   }, [handleFile]);
 
+  const downloadImage = useCallback((data: string) => {
+    const ext = data.startsWith('data:image/png') ? 'png' : data.startsWith('data:image/webp') ? 'webp' : 'jpg';
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = `${label.replace(/\s+/g, '-').toLowerCase() || 'image'}-${Date.now()}.${ext}`;
+    link.click();
+  }, [label]);
+
   if (compact && value) {
     return (
       <div className="relative group">
         <img src={value} alt={label} className="w-12 h-12 rounded-md object-cover border border-border" />
-        <button
-          onClick={() => onChange(null)}
-          className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="w-3 h-3 text-destructive-foreground" />
-        </button>
+        <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => downloadImage(value)}
+            className="w-4 h-4 bg-primary rounded-full flex items-center justify-center"
+          >
+            <Download className="w-2.5 h-2.5 text-primary-foreground" />
+          </button>
+          <button
+            onClick={() => onChange(null)}
+            className="w-4 h-4 bg-destructive rounded-full flex items-center justify-center"
+          >
+            <X className="w-3 h-3 text-destructive-foreground" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -51,6 +67,12 @@ export function ImageUpload({ label, value, onChange, compact = false }: ImageUp
               className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
             >
               Replace
+            </button>
+            <button
+              onClick={() => downloadImage(value)}
+              className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            >
+              Save
             </button>
             <button
               onClick={() => onChange(null)}
