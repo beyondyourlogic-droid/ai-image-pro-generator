@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Wand2, Loader2, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Wand2, Loader2, Trash2, RotateCcw, Download } from 'lucide-react';
 import { CharacterConfig, GenerationSettings, GeneratedImage, createDefaultCharacter } from '@/types/studio';
 import { CharacterPanel } from '@/components/studio/CharacterPanel';
 import { GenerationSettingsPanel } from '@/components/studio/GenerationSettings';
@@ -27,6 +27,60 @@ export default function Index() {
   ]);
   const [settings, setSettings] = useState<GenerationSettings>(defaultSettings);
   const { isGenerating, generatedImages, generate, clearHistory } = useImageGeneration();
+
+  const downloadAllMedia = useCallback(() => {
+    const mediaItems: { data: string; name: string }[] = [];
+    const seen = new Set<string>();
+
+    const add = (data: string | null | undefined, label: string) => {
+      if (!data || seen.has(data)) return;
+      seen.add(data);
+      const ext = data.startsWith('data:image/png') ? 'png' : data.startsWith('data:image/webp') ? 'webp' : 'jpg';
+      mediaItems.push({ data, name: `${label}.${ext}` });
+    };
+
+    // Collect from current characters
+    for (const char of characters) {
+      const p = char.label.replace(/\s+/g, '-');
+      add(char.faceImage, `${p}-face`);
+      char.additionalFaceImages?.forEach((img, i) => add(img, `${p}-face-${i + 2}`));
+      add(char.clothingImage, `${p}-clothing`);
+      add(char.poseReferenceImage, `${p}-pose-ref`);
+      add(char.hairstyleImage, `${p}-hairstyle`);
+      add(char.hairColorImage, `${p}-hair-color`);
+      add(char.eyeColorImage, `${p}-eye-color`);
+      add(char.sideProfileImage, `${p}-side-profile`);
+      char.distinguishingMarks?.forEach((m, i) => add(m.imageData, `${p}-mark-${i + 1}`));
+      char.props?.forEach((pr, i) => add(pr.imageData, `${p}-prop-${i + 1}`));
+    }
+
+    // Collect from all generated images' characters & settings
+    for (const gen of generatedImages) {
+      add(gen.imageData, `generated-${gen.id.slice(0, 8)}`);
+      for (const char of gen.characters || []) {
+        const p = `hist-${char.label.replace(/\s+/g, '-')}`;
+        add(char.faceImage, `${p}-face`);
+        char.additionalFaceImages?.forEach((img, i) => add(img, `${p}-face-${i + 2}`));
+        add(char.clothingImage, `${p}-clothing`);
+        add(char.poseReferenceImage, `${p}-pose-ref`);
+        add(char.hairstyleImage, `${p}-hairstyle`);
+        add(char.hairColorImage, `${p}-hair-color`);
+        add(char.eyeColorImage, `${p}-eye-color`);
+        add(char.sideProfileImage, `${p}-side-profile`);
+        char.distinguishingMarks?.forEach((m, i) => add(m.imageData, `${p}-mark-${i + 1}`));
+        char.props?.forEach((pr, i) => add(pr.imageData, `${p}-prop-${i + 1}`));
+      }
+      add(gen.settings?.backgroundImage, `bg-${gen.id.slice(0, 8)}`);
+    }
+
+    // Download each
+    for (const item of mediaItems) {
+      const link = document.createElement('a');
+      link.href = item.data;
+      link.download = item.name;
+      link.click();
+    }
+  }, [characters, generatedImages]);
   const addCharacter = useCallback(() => {
     if (characters.length >= 5) return;
     setCharacters((prev) => [...prev, createDefaultCharacter(crypto.randomUUID(), prev.length)]);
@@ -137,12 +191,20 @@ export default function Index() {
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground font-mono">{generatedImages.length} images</span>
             {generatedImages.length > 0 && (
-              <button
-                onClick={clearHistory}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-              >
-                <Trash2 className="w-3 h-3" /> Clear
-              </button>
+              <>
+                <button
+                  onClick={downloadAllMedia}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase font-semibold text-primary hover:bg-primary/10 rounded-md transition-colors"
+                >
+                  <Download className="w-3 h-3" /> Download All Media
+                </button>
+                <button
+                  onClick={clearHistory}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" /> Clear
+                </button>
+              </>
             )}
           </div>
         </div>
